@@ -10,6 +10,7 @@ nv.models.legend = function() {
     , getKey = function(d) { return d.key }
     , color = nv.utils.defaultColor()
     , align = true
+    , isVertical = false
     , rightAlign = true
     , updateState = true   //If true, legend will update data.disabled and trigger a 'stateChange' dispatch.
     , radioButtonMode = false   //If true, clicking legend items will cause it to behave like a radio button. (only one can be selected at a time)
@@ -17,7 +18,34 @@ nv.models.legend = function() {
     ;
 
   //============================================================
+  var legendPaginator = (function() {
+    function legendPaginator(allLegends, numLegendsPerPage) {
+        this.allLegends = allLegends;
+        this.numLegendsPerPage = numLegendsPerPage;
+        this.currentPage = 0;
+        this.totalPages = Math.ceil(this.allLegends.length / this.numLegendsPerPage);
+        this.makeData();
+    }
+    legendPaginator.prototype.makeData = function () {
+        var startingPoint = this.currentPage * this.numLegendsPerPage;
+        this.data = this.allLegends.slice(startingPoint, startingPoint + this.numLegendsPerPage);
+    };
 
+    legendPaginator.prototype.nextPage = function () {
+        if (this.currentPage < Math.floor(this.allLegends.length / this.numLegendsPerPage)) {
+            this.currentPage++;
+            this.makeData();
+        }
+    };
+
+    legendPaginator.prototype.prevPage = function () {
+        if (this.currentPage > 0) {
+            this.currentPage--;
+            this.makeData();
+        }
+    };
+    return legendPaginator;
+  })();
 
   function chart(selection) {
     selection.each(function(data) {
@@ -102,99 +130,102 @@ nv.models.legend = function() {
       //TODO: implement fixed-width and max-width options (max-width is especially useful with the align option)
 
       // NEW ALIGNING CODE, TODO: clean up
-      if (align) {
 
-        var seriesWidths = [];
-        series.each(function(d,i) {
-              var legendText = d3.select(this).select('text');
-              var nodeTextLength;
-              try {
-                nodeTextLength = legendText.getComputedTextLength();
-                // If the legendText is display:none'd (nodeTextLength == 0), simulate an error so we approximate, instead
-                if(nodeTextLength <= 0) throw Error();
-              }
-              catch(e) {
-                nodeTextLength = nv.utils.calcApproxTextWidth(legendText);
-              }
+      if (isVertical) {
+        
+      } else {
+        if (align) {
+          var seriesWidths = [];
+          series.each(function(d,i) {
+                var legendText = d3.select(this).select('text');
+                var nodeTextLength;
+                try {
+                  nodeTextLength = legendText.getComputedTextLength();
+                  // If the legendText is display:none'd (nodeTextLength == 0), simulate an error so we approximate, instead
+                  if(nodeTextLength <= 0) throw Error();
+                }
+                catch(e) {
+                  nodeTextLength = nv.utils.calcApproxTextWidth(legendText);
+                }
 
-              seriesWidths.push(nodeTextLength + 28); // 28 is ~ the width of the circle plus some padding
-            });
+                seriesWidths.push(nodeTextLength + 28); // 28 is ~ the width of the circle plus some padding
+              });
 
-        var seriesPerRow = 0;
-        var legendWidth = 0;
-        var columnWidths = [];
+          var seriesPerRow = 0;
+          var legendWidth = 0;
+          var columnWidths = [];
 
-        while ( legendWidth < availableWidth && seriesPerRow < seriesWidths.length) {
-          columnWidths[seriesPerRow] = seriesWidths[seriesPerRow];
-          legendWidth += seriesWidths[seriesPerRow++];
-        }
-        if (seriesPerRow === 0) seriesPerRow = 1; //minimum of one series per row
+          while ( legendWidth < availableWidth && seriesPerRow < seriesWidths.length) {
+            columnWidths[seriesPerRow] = seriesWidths[seriesPerRow];
+            legendWidth += seriesWidths[seriesPerRow++];
+          }
+          if (seriesPerRow === 0) seriesPerRow = 1; //minimum of one series per row
 
 
-        while ( legendWidth > availableWidth && seriesPerRow > 1 ) {
-          columnWidths = [];
-          seriesPerRow--;
+          while ( legendWidth > availableWidth && seriesPerRow > 1 ) {
+            columnWidths = [];
+            seriesPerRow--;
 
-          for (var k = 0; k < seriesWidths.length; k++) {
-            if (seriesWidths[k] > (columnWidths[k % seriesPerRow] || 0) )
-              columnWidths[k % seriesPerRow] = seriesWidths[k];
+            for (var k = 0; k < seriesWidths.length; k++) {
+              if (seriesWidths[k] > (columnWidths[k % seriesPerRow] || 0) )
+                columnWidths[k % seriesPerRow] = seriesWidths[k];
+            }
+
+            legendWidth = columnWidths.reduce(function(prev, cur, index, array) {
+                            return prev + cur;
+                          });
           }
 
-          legendWidth = columnWidths.reduce(function(prev, cur, index, array) {
-                          return prev + cur;
-                        });
+          var xPositions = [];
+          for (var i = 0, curX = 0; i < seriesPerRow; i++) {
+              xPositions[i] = curX;
+              curX += columnWidths[i];
+          }
+
+          series
+              .attr('transform', function(d, i) {
+                return 'translate(' + xPositions[i % seriesPerRow] + ',' + (5 + Math.floor(i / seriesPerRow) * 20) + ')';
+              });
+
+          //position legend as far right as possible within the total width
+          if (rightAlign) {
+             g.attr('transform', 'translate(' + (width - margin.right - legendWidth) + ',' + margin.top + ')');
+          }
+          else {
+             g.attr('transform', 'translate(0' + ',' + margin.top + ')');
+          }
+
+          height = margin.top + margin.bottom + (Math.ceil(seriesWidths.length / seriesPerRow) * 20);
+
+        } else {
+
+          var ypos = 5,
+              newxpos = 5,
+              maxwidth = 0,
+              xpos;
+          series
+              .attr('transform', function(d, i) {
+                var length = d3.select(this).select('text').node().getComputedTextLength() + 28;
+                xpos = newxpos;
+
+                if (width < margin.left + margin.right + xpos + length) {
+                  newxpos = xpos = 5;
+                  ypos += 20;
+                }
+
+                newxpos += length;
+                if (newxpos > maxwidth) maxwidth = newxpos;
+
+                return 'translate(' + xpos + ',' + ypos + ')';
+              });
+
+          //position legend as far right as possible within the total width
+          g.attr('transform', 'translate(' + (width - margin.right - maxwidth) + ',' + margin.top + ')');
+
+          height = margin.top + margin.bottom + ypos + 15;
+
         }
-
-        var xPositions = [];
-        for (var i = 0, curX = 0; i < seriesPerRow; i++) {
-            xPositions[i] = curX;
-            curX += columnWidths[i];
-        }
-
-        series
-            .attr('transform', function(d, i) {
-              return 'translate(' + xPositions[i % seriesPerRow] + ',' + (5 + Math.floor(i / seriesPerRow) * 20) + ')';
-            });
-
-        //position legend as far right as possible within the total width
-        if (rightAlign) {
-           g.attr('transform', 'translate(' + (width - margin.right - legendWidth) + ',' + margin.top + ')');
-        }
-        else {
-           g.attr('transform', 'translate(0' + ',' + margin.top + ')');
-        }
-
-        height = margin.top + margin.bottom + (Math.ceil(seriesWidths.length / seriesPerRow) * 20);
-
-      } else {
-
-        var ypos = 5,
-            newxpos = 5,
-            maxwidth = 0,
-            xpos;
-        series
-            .attr('transform', function(d, i) {
-              var length = d3.select(this).select('text').node().getComputedTextLength() + 28;
-              xpos = newxpos;
-
-              if (width < margin.left + margin.right + xpos + length) {
-                newxpos = xpos = 5;
-                ypos += 20;
-              }
-
-              newxpos += length;
-              if (newxpos > maxwidth) maxwidth = newxpos;
-
-              return 'translate(' + xpos + ',' + ypos + ')';
-            });
-
-        //position legend as far right as possible within the total width
-        g.attr('transform', 'translate(' + (width - margin.right - maxwidth) + ',' + margin.top + ')');
-
-        height = margin.top + margin.bottom + ypos + 15;
-
       }
-
     });
 
     return chart;
@@ -265,6 +296,17 @@ nv.models.legend = function() {
     return chart;
   };
 
+  chart.setVertical = function(_) {
+    if (!arguments.length) return isVertical;
+    isVertical = _;
+    return chart;
+  }
+
+  chart.paginate = function(allLegendData, numPerPage) {
+    if (!arguments.length) return legendPaginator;
+    legendPaginator = new legendPaginator(allLegendData, numPerPage);
+    return chart;
+  }
   //============================================================
 
 

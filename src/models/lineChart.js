@@ -17,6 +17,8 @@ nv.models.lineChart = function() {
     , width = null
     , height = null
     , showLegend = true
+    , verticalLegend = false
+    , paginateNumPerPage = null
     , showXAxis = true
     , showYAxis = true
     , rightAlignYAxis = false
@@ -146,20 +148,43 @@ nv.models.lineChart = function() {
       // Legend
 
       if (showLegend) {
-        legend.width(availableWidth);
 
-        g.select('.nv-legendWrap')
-            .datum(data)
-            .call(legend);
+        if (paginateNumPerPage)
+          legend.paginate(data, paginateNumPerPage);
 
-        if ( margin.top != legend.height()) {
-          margin.top = legend.height();
-          availableHeight = (height || parseInt(container.style('height')) || 400)
-                             - margin.top - margin.bottom;
+        if (verticalLegend) {
+          legend.setVertical(true);
+          // With a verticalLegend, we will change both the availableWidth
+          // as well as set a legend width
+          // Allow setting the legend width
+          var legendWidth = 100;
+          availableWidth = availableWidth - (legendWidth + margin.right);
+          legend.width(legendWidth);
+
+            g.select('.nv-legendWrap')
+                .datum(data)
+                .call(legend);
+
+            wrap.select('.nv-legendWrap')
+                .attr('transform', 'translate('+(availableWidth + margin.left)+',' + (margin.top) +')')
+
+        } else {
+
+          legend.width(availableWidth);
+
+          g.select('.nv-legendWrap')
+              .datum(data)
+              .call(legend);
+
+          if ( margin.top != legend.height()) {
+            margin.top = legend.height();
+            availableHeight = (height || parseInt(container.style('height')) || 400)
+                               - margin.top - margin.bottom;
+          }
+
+          wrap.select('.nv-legendWrap')
+              .attr('transform', 'translate(0,' + (-margin.top) +')')
         }
-
-        wrap.select('.nv-legendWrap')
-            .attr('transform', 'translate(0,' + (-margin.top) +')')
       }
 
       //------------------------------------------------------------
@@ -459,6 +484,18 @@ nv.models.lineChart = function() {
     transitionDuration = _;
     return chart;
   };
+
+  chart.verticalLegend = function(_) {
+    if (!arguments.length) return verticalLegend;
+    verticalLegend = _;
+    return chart;
+  }
+
+  chart.paginate = function(numPerPage) {
+    if (!arguments.length) return paginateNumPerPage;
+    paginateNumPerPage = numPerPage;
+    return chart;
+  }
 
   //============================================================
 

@@ -122,6 +122,11 @@
         <button>Select chart</button>
         <svg></svg>
       </div>
+      <div class='chart third' id='chart18'>
+        Chart with 15 series with scrolling legend
+        <button>Select chart</button>
+        <svg></svg>
+      </div>
     </div>
 
 <script src="../lib/d3.v3.js"></script>
@@ -192,6 +197,12 @@ defaultChartConfig("chart15", withNaNs());
 defaultChartConfig("chart16", duplicateY(), false);
 defaultChartConfig("chart17", tinyPoints(), false);
 
+defaultChartConfig("chart18", customLegend(), true, false, {
+  legendWidth: 200,
+  paginate: 3,
+  verticalLegend: true
+});
+
 function defaultChartConfig(containerid, data, guideline, useDates, auxOptions) {
   if (auxOptions === undefined) auxOptions = {};
   if (guideline === undefined) guideline = true;
@@ -212,6 +223,12 @@ function defaultChartConfig(containerid, data, guideline, useDates, auxOptions) 
 
     if (auxOptions.forceY) 
       chart.forceY([0]);
+
+    if (auxOptions.paginate)
+      chart.paginate(data, auxOptions.paginate);
+
+    if (auxOptions.verticalLegend)
+      chart.verticalLegend(true);
 
     var formatter;
     if (useDates !== undefined) {
@@ -380,6 +397,10 @@ function lotsofSeries() {
       rval.push({key: "Series " + n, area: isArea, values: values});
   }
   return rval;
+}
+
+function customLegend() {
+  return lotsofSeries();
 }
 
 function backwards() {
